@@ -8,12 +8,13 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
     
     <script type="text/babel">
-        const { useState, useMemo } = React;
+        const { useState, useMemo, useEffect, useRef } = React;
 
         const CrimeDashboard = () => {
           const [interventions, setInterventions] = useState({
@@ -28,6 +29,8 @@
           });
 
           const [showProposal, setShowProposal] = useState(false);
+          const chartRef = useRef(null);
+          const chartInstance = useRef(null);
 
           const baseline = {
             population: 10902,
@@ -104,6 +107,101 @@
               communityTrustPct
             };
           }, [interventions]);
+
+          useEffect(() => {
+            if (chartRef.current) {
+              if (chartInstance.current) {
+                chartInstance.current.destroy();
+              }
+
+              const ctx = chartRef.current.getContext('2d');
+              chartInstance.current = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                  labels: ['Violent', 'Property'],
+                  datasets: [
+                    {
+                      label: 'Baseline',
+                      data: [baseline.violentCrimes, baseline.propertyCrimes],
+                      backgroundColor: '#94a3b8',
+                      borderRadius: 6,
+                      borderWidth: 0
+                    },
+                    {
+                      label: 'With Intervention',
+                      data: [calculations.newViolentCrimes, calculations.newPropertyCrimes],
+                      backgroundColor: '#3b82f6',
+                      borderRadius: 6,
+                      borderWidth: 0
+                    }
+                  ]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                      labels: {
+                        font: {
+                          size: 12,
+                          family: "'Inter', sans-serif"
+                        },
+                        padding: 15,
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                      }
+                    },
+                    tooltip: {
+                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                      padding: 12,
+                      titleFont: {
+                        size: 13
+                      },
+                      bodyFont: {
+                        size: 13
+                      },
+                      cornerRadius: 6
+                    }
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      grid: {
+                        color: '#f1f5f9',
+                        drawBorder: false
+                      },
+                      ticks: {
+                        font: {
+                          size: 11
+                        },
+                        color: '#64748b'
+                      }
+                    },
+                    x: {
+                      grid: {
+                        display: false,
+                        drawBorder: false
+                      },
+                      ticks: {
+                        font: {
+                          size: 12,
+                          weight: '500'
+                        },
+                        color: '#475569'
+                      }
+                    }
+                  }
+                }
+              });
+            }
+
+            return () => {
+              if (chartInstance.current) {
+                chartInstance.current.destroy();
+              }
+            };
+          }, [calculations]);
 
           const handleSliderChange = (key, value) => {
             setInterventions(prev => ({ ...prev, [key]: value }));
@@ -295,7 +393,7 @@ Contact: Chicago Police Department, District 11
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-3 gap-6">
                   <div className="bg-white rounded-lg shadow-xl p-6">
                     <h2 className="text-xl font-bold text-slate-800 mb-4">Community Impact Visualization</h2>
                     
@@ -378,29 +476,27 @@ Contact: Chicago Police Department, District 11
                           <div className="text-2xl font-bold text-green-700">${calculations.costSavings.toLocaleString()}</div>
                         </div>
                       </div>
+                    </div>
+                  </div>
 
-                      <div className="bg-white border-2 border-slate-200 rounded-lg p-6 mt-4">
-                        <h3 className="text-lg font-bold text-slate-800 mb-4">Crime Statistics</h3>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center p-3 bg-slate-50 rounded">
-                            <span className="font-semibold text-slate-700">Violent Crimes</span>
-                            <div className="text-right">
-                              <div className="text-sm text-slate-500">Baseline: {baseline.violentCrimes}</div>
-                              <div className="text-lg font-bold text-blue-600">Projected: {calculations.newViolentCrimes}</div>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center p-3 bg-slate-50 rounded">
-                            <span className="font-semibold text-slate-700">Property Crimes</span>
-                            <div className="text-right">
-                              <div className="text-sm text-slate-500">Baseline: {baseline.propertyCrimes}</div>
-                              <div className="text-lg font-bold text-blue-600">Projected: {calculations.newPropertyCrimes}</div>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center p-3 bg-green-50 rounded border-2 border-green-200">
-                            <span className="font-bold text-slate-700">Total Reduction</span>
-                            <div className="text-2xl font-bold text-green-700">{calculations.crimesPrevented} crimes</div>
-                          </div>
-                        </div>
+                  <div className="bg-white rounded-lg shadow-xl p-6">
+                    <h2 className="text-xl font-bold text-slate-800 mb-4">Crime Rate Comparison</h2>
+                    <div style={{ height: '400px' }}>
+                      <canvas ref={chartRef}></canvas>
+                    </div>
+
+                    <div className="mt-6 space-y-3">
+                      <div className="bg-slate-50 p-3 rounded">
+                        <div className="text-sm text-slate-600">Baseline Total</div>
+                        <div className="text-2xl font-bold text-slate-700">{baseline.totalCrimes} crimes/year</div>
+                      </div>
+                      <div className="bg-blue-50 p-3 rounded">
+                        <div className="text-sm text-blue-600">Projected Total</div>
+                        <div className="text-2xl font-bold text-blue-700">{calculations.newTotalCrimes} crimes/year</div>
+                      </div>
+                      <div className="bg-green-50 p-3 rounded">
+                        <div className="text-sm text-green-600">Reduction</div>
+                        <div className="text-2xl font-bold text-green-700">{calculations.crimesPrevented} crimes prevented</div>
                       </div>
                     </div>
                   </div>
