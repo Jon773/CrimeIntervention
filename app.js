@@ -1,0 +1,524 @@
+cconst { useState, useMemo } = React;
+const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
+
+const CrimeDashboard = () => {
+  const [interventions, setInterventions] = useState({
+    hotSpots: 0,
+    focusedDeterrence: 0,
+    communityEngagement: 0,
+    additionalStaffing: 0,
+    foodAccess: 0,
+    liquorReduction: 0,
+    streetLighting: 0,
+    blightRemoval: 0
+  });
+
+  const [showProposal, setShowProposal] = useState(false);
+
+  const baseline = {
+    population: 10902,
+    violentCrimes: 82,
+    propertyCrimes: 425,
+    totalCrimes: 507,
+    costPerResident: 587
+  };
+
+  const interventionData = {
+    hotSpots: { name: 'Hot Spots Policing', effect: 0.45, citation: 'Braga (2019)', reduction: '33.8%', cost: 125000, staffMultiplier: 0.15 },
+    focusedDeterrence: { name: 'Focused Deterrence', effect: 0.70, citation: 'Braga & Weisburd (2019)', reduction: '65.7% for gangs', cost: 180000, staffMultiplier: 0.12 },
+    communityEngagement: { name: 'Community Engagement', effect: 0.20, citation: 'Koper (2024)', reduction: '20%', cost: 95000, staffMultiplier: 0.08 },
+    additionalStaffing: { name: 'Additional Staffing', effect: 0.12, citation: 'National Academies (2018)', reduction: '12%', cost: 85000, staffMultiplier: 0.25 },
+    foodAccess: { name: 'Food Store Access', effect: 0.08, citation: 'Sadler (2016)', reduction: '8%', cost: 250000, staffMultiplier: 0 },
+    liquorReduction: { name: 'Liquor Store Reduction', effect: 0.12, citation: 'Gruenewald (2006)', reduction: '12%', cost: 150000, staffMultiplier: 0 },
+    streetLighting: { name: 'Street Lighting', effect: 0.18, citation: 'Welsh & Farrington (2008)', reduction: '20%', cost: 320000, staffMultiplier: 0 },
+    blightRemoval: { name: 'Blight Removal', effect: 0.10, citation: 'Branas (2018)', reduction: '29% gun violence', cost: 280000, staffMultiplier: 0 }
+  };
+
+  const calculations = useMemo(() => {
+    const activeInterventions = Object.entries(interventions).filter(([_, value]) => value > 0);
+    
+    let combinedEffect = 0;
+    if (activeInterventions.length > 0) {
+      const sortedEffects = activeInterventions
+        .map(([key, intensity]) => interventionData[key].effect * (intensity / 100))
+        .sort((a, b) => b - a);
+      
+      combinedEffect = sortedEffects.reduce((acc, effect, index) => {
+        const efficiency = Math.pow(0.88, index);
+        return acc + (effect * efficiency);
+      }, 0);
+      
+      combinedEffect = Math.min(combinedEffect, 0.80);
+    }
+
+    const newViolentCrimes = Math.round(baseline.violentCrimes * (1 - combinedEffect));
+    const newPropertyCrimes = Math.round(baseline.propertyCrimes * (1 - combinedEffect));
+    const newTotalCrimes = newViolentCrimes + newPropertyCrimes;
+    const crimesPrevented = baseline.totalCrimes - newTotalCrimes;
+    
+    const totalCost = Object.entries(interventions).reduce((sum, [key, intensity]) => {
+      return sum + (interventionData[key].cost * (intensity / 100));
+    }, 0);
+
+    const officersNeeded = Object.entries(interventions).reduce((sum, [key, intensity]) => {
+      return sum + (interventionData[key].staffMultiplier * (intensity / 100) * 10);
+    }, 0);
+
+    const costSavings = crimesPrevented * baseline.costPerResident;
+    const roi = totalCost > 0 ? ((costSavings - totalCost) / totalCost * 100) : 0;
+
+    const safetyScore = Math.min(100, (1 - (newTotalCrimes / baseline.totalCrimes)) * 100);
+    const foodAccessPct = Math.min(100, 45 + (interventions.foodAccess * 0.35));
+    const lightingPct = Math.min(100, 62 + (interventions.streetLighting * 0.30));
+    const blightReductionPct = Math.min(100, interventions.blightRemoval * 0.85);
+    const communityTrustPct = Math.min(100, 38 + (interventions.communityEngagement * 0.45) + (interventions.focusedDeterrence * 0.15));
+    
+    return {
+      combinedEffect,
+      newViolentCrimes,
+      newPropertyCrimes,
+      newTotalCrimes,
+      crimesPrevented,
+      totalCost,
+      officersNeeded,
+      costSavings,
+      roi,
+      safetyScore,
+      foodAccessPct,
+      lightingPct,
+      blightReductionPct,
+      communityTrustPct
+    };
+  }, [interventions]);
+
+  const chartData = [
+    {
+      type: 'Violent',
+      Baseline: baseline.violentCrimes,
+      Intervention: calculations.newViolentCrimes
+    },
+    {
+      type: 'Property',
+      Baseline: baseline.propertyCrimes,
+      Intervention: calculations.newPropertyCrimes
+    }
+  ];
+
+  const handleSliderChange = (key, value) => {
+    setInterventions(prev => ({ ...prev, [key]: value }));
+  };
+
+  const generateProposal = () => {
+    const activeInterventions = Object.entries(interventions).filter(([_, value]) => value > 0);
+    
+    let proposal = `WEST GARFIELD PARK CRIME INTERVENTION PROPOSAL
+Chicago Police District 11 | Population: ${baseline.population.toLocaleString()}
+
+═══════════════════════════════════════════════════════════════
+
+EXECUTIVE SUMMARY
+
+Current State:
+• Total Annual Crimes: ${baseline.totalCrimes}
+• Violent Crimes: ${baseline.violentCrimes}
+• Property Crimes: ${baseline.propertyCrimes}
+• Cost to Community: $${(baseline.totalCrimes * baseline.costPerResident).toLocaleString()}
+
+Projected Outcomes with Intervention:
+• Total Annual Crimes: ${calculations.newTotalCrimes} (${calculations.crimesPrevented} prevented)
+• Crime Reduction: ${(calculations.combinedEffect * 100).toFixed(1)}%
+• Violent Crimes: ${calculations.newViolentCrimes}
+• Property Crimes: ${calculations.newPropertyCrimes}
+• Victims Prevented: ${calculations.crimesPrevented}
+
+Financial Analysis:
+• Total Implementation Cost: $${calculations.totalCost.toLocaleString()}
+• Annual Cost Savings: $${calculations.costSavings.toLocaleString()}
+• Return on Investment: ${calculations.roi.toFixed(1)}%
+• Officers Required: ${calculations.officersNeeded.toFixed(1)}
+
+═══════════════════════════════════════════════════════════════
+
+INTERVENTION STRATEGIES
+
+`;
+
+    activeInterventions.forEach(([key, intensity]) => {
+      const data = interventionData[key];
+      proposal += `${data.name} (${intensity}% Implementation)
+────────────────────────────────────────────────────────────
+Research Evidence: ${data.citation} demonstrated ${data.reduction} reduction in crime rates through this intervention strategy.
+
+Implementation Level: ${intensity}% intensity
+Projected Effect: ${(data.effect * (intensity / 100) * 100).toFixed(1)}% crime reduction
+Annual Cost: $${(data.cost * (intensity / 100)).toLocaleString()}
+${data.staffMultiplier > 0 ? `Officers Needed: ${(data.staffMultiplier * (intensity / 100) * 10).toFixed(1)}` : 'Staff Impact: Minimal'}
+
+`;
+    });
+
+    proposal += `═══════════════════════════════════════════════════════════════
+
+BUDGET BREAKDOWN
+
+Personnel Costs:
+`;
+
+    activeInterventions.forEach(([key, intensity]) => {
+      const data = interventionData[key];
+      const cost = data.cost * (intensity / 100);
+      proposal += `• ${data.name}: $${cost.toLocaleString()}\n`;
+    });
+
+    proposal += `
+Total Annual Budget: $${calculations.totalCost.toLocaleString()}
+
+═══════════════════════════════════════════════════════════════
+
+PROJECTED COMMUNITY IMPACT
+
+Safety & Security:
+• Community Safety Score: ${calculations.safetyScore.toFixed(1)}%
+• Community Trust Level: ${calculations.communityTrustPct.toFixed(1)}%
+
+Environmental Quality:
+• Food Access Improvement: ${calculations.foodAccessPct.toFixed(1)}%
+• Street Lighting Coverage: ${calculations.lightingPct.toFixed(1)}%
+• Blight Reduction: ${calculations.blightReductionPct.toFixed(1)}%
+
+Economic Benefits:
+• Cost Savings to Community: $${calculations.costSavings.toLocaleString()}/year
+• Economic Value per Dollar Invested: $${(calculations.costSavings / calculations.totalCost).toFixed(2)}
+
+═══════════════════════════════════════════════════════════════
+
+IMPLEMENTATION TIMELINE
+
+Phase 1 (Months 1-3): Planning and Community Engagement
+• Stakeholder meetings and community input sessions
+• Officer training and resource allocation
+• Baseline data collection and analysis
+
+Phase 2 (Months 4-6): Initial Deployment
+• Launch priority interventions
+• Establish monitoring systems
+• Begin community partnerships
+
+Phase 3 (Months 7-12): Full Implementation
+• Scale interventions to target intensity
+• Continuous evaluation and adjustment
+• Community feedback integration
+
+Phase 4 (Ongoing): Sustainability and Assessment
+• Quarterly performance reviews
+• Annual outcome evaluation
+• Long-term community relationship building
+
+═══════════════════════════════════════════════════════════════
+
+RESEARCH CITATIONS
+
+• Braga, A. A. (2019). Hot spots policing effectiveness: 33.8% crime reduction
+• Braga, A. A., & Weisburd, D. (2019). Focused deterrence: 65.7% reduction in gang violence
+• Koper, C. S. (2024). Community engagement strategies: 20% crime reduction
+• National Academies of Sciences (2018). Police staffing and crime: 12% effect size
+• Sadler, R. C. (2016). Food access and crime: 8% reduction with improved access
+• Gruenewald, P. J. (2006). Alcohol outlets and violence: 12% reduction effect
+• Welsh, B. C., & Farrington, D. P. (2008). Street lighting: 20% crime reduction
+• Branas, C. C. (2018). Blight remediation: 29% reduction in gun violence
+
+═══════════════════════════════════════════════════════════════
+
+Prepared: ${new Date().toLocaleDateString()}
+Contact: Chicago Police Department, District 11
+`;
+
+    return proposal;
+  };
+
+  const copyToClipboard = () => {
+    const proposal = generateProposal();
+    navigator.clipboard.writeText(proposal);
+    alert('Proposal copied to clipboard!');
+  };
+
+  const downloadProposal = () => {
+    const proposal = generateProposal();
+    const blob = new Blob([proposal], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'west_garfield_park_intervention_proposal.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // X icon component (since we can't import lucide-react easily)
+  const XIcon = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  );
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-xl p-6 mb-6">
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">West Garfield Park Crime Intervention Dashboard</h1>
+          <p className="text-slate-600 mb-4">Chicago Police District 11 | Population: {baseline.population.toLocaleString()} | Baseline: {baseline.totalCrimes} crimes/year</p>
+          
+          <div className="grid grid-cols-4 gap-4 mb-4">
+            <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
+              <div className="text-sm text-blue-600 font-semibold">Crime Reduction</div>
+              <div className="text-3xl font-bold text-blue-700">{(calculations.combinedEffect * 100).toFixed(1)}%</div>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
+              <div className="text-sm text-green-600 font-semibold">New Crimes/Year</div>
+              <div className="text-3xl font-bold text-green-700">{calculations.newTotalCrimes}</div>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg border-2 border-purple-200">
+              <div className="text-sm text-purple-600 font-semibold">Officers Needed</div>
+              <div className="text-3xl font-bold text-purple-700">{calculations.officersNeeded.toFixed(1)}</div>
+            </div>
+            <div className="bg-amber-50 p-4 rounded-lg border-2 border-amber-200">
+              <div className="text-sm text-amber-600 font-semibold">ROI</div>
+              <div className="text-3xl font-bold text-amber-700">{calculations.roi.toFixed(1)}%</div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowProposal(true)}
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg"
+          >
+            Generate Implementation Proposal
+          </button>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-3 gap-6">
+          {/* Left Column - Community Impact */}
+          <div className="bg-white rounded-lg shadow-xl p-6">
+            <h2 className="text-xl font-bold text-slate-800 mb-4">Community Impact Visualization</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-semibold text-slate-700">Safety Score</span>
+                  <span className="text-sm font-bold text-blue-600">{calculations.safetyScore.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-4">
+                  <div
+                    className="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full transition-all duration-500"
+                    style={{ width: `${calculations.safetyScore}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-semibold text-slate-700">Food Access</span>
+                  <span className="text-sm font-bold text-green-600">{calculations.foodAccessPct.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-4">
+                  <div
+                    className="bg-gradient-to-r from-green-500 to-green-600 h-4 rounded-full transition-all duration-500"
+                    style={{ width: `${calculations.foodAccessPct}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-semibold text-slate-700">Street Lighting</span>
+                  <span className="text-sm font-bold text-yellow-600">{calculations.lightingPct.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-4">
+                  <div
+                    className="bg-gradient-to-r from-yellow-500 to-yellow-600 h-4 rounded-full transition-all duration-500"
+                    style={{ width: `${calculations.lightingPct}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-semibold text-slate-700">Blight Reduction</span>
+                  <span className="text-sm font-bold text-orange-600">{calculations.blightReductionPct.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-4">
+                  <div
+                    className="bg-gradient-to-r from-orange-500 to-orange-600 h-4 rounded-full transition-all duration-500"
+                    style={{ width: `${calculations.blightReductionPct}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-semibold text-slate-700">Community Trust</span>
+                  <span className="text-sm font-bold text-purple-600">{calculations.communityTrustPct.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-4">
+                  <div
+                    className="bg-gradient-to-r from-purple-500 to-purple-600 h-4 rounded-full transition-all duration-500"
+                    style={{ width: `${calculations.communityTrustPct}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border-2 border-blue-200 mt-6">
+                <div className="text-center">
+                  <div className="text-sm text-slate-600 font-semibold mb-1">Victims Prevented</div>
+                  <div className="text-4xl font-bold text-blue-700">{calculations.crimesPrevented}</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-200">
+                <div className="text-center">
+                  <div className="text-sm text-slate-600 font-semibold mb-1">Economic Benefit</div>
+                  <div className="text-2xl font-bold text-green-700">${calculations.costSavings.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Middle Column - Chart */}
+          <div className="bg-white rounded-lg shadow-xl p-6">
+            <h2 className="text-xl font-bold text-slate-800 mb-4">Crime Rate Comparison</h2>
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="type" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="Baseline" fill="#94a3b8" name="Baseline" />
+                <Bar dataKey="Intervention" fill="#3b82f6" name="With Intervention" />
+              </BarChart>
+            </ResponsiveContainer>
+
+            <div className="mt-6 space-y-3">
+              <div className="bg-slate-50 p-3 rounded">
+                <div className="text-sm text-slate-600">Baseline Total</div>
+                <div className="text-2xl font-bold text-slate-700">{baseline.totalCrimes} crimes/year</div>
+              </div>
+              <div className="bg-blue-50 p-3 rounded">
+                <div className="text-sm text-blue-600">Projected Total</div>
+                <div className="text-2xl font-bold text-blue-700">{calculations.newTotalCrimes} crimes/year</div>
+              </div>
+              <div className="bg-green-50 p-3 rounded">
+                <div className="text-sm text-green-600">Reduction</div>
+                <div className="text-2xl font-bold text-green-700">{calculations.crimesPrevented} crimes prevented</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Sliders */}
+          <div className="bg-white rounded-lg shadow-xl p-6">
+            <h2 className="text-xl font-bold text-slate-800 mb-4">Intervention Controls</h2>
+            
+            <div className="space-y-6">
+              <div>
+                <h3 className="font-bold text-slate-700 mb-3 text-sm uppercase tracking-wide">Policing Strategies</h3>
+                
+                {['hotSpots', 'focusedDeterrence', 'communityEngagement', 'additionalStaffing'].map(key => (
+                  <div key={key} className="mb-4">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm font-medium text-slate-700">{interventionData[key].name}</span>
+                      <span className="text-sm font-bold text-blue-600">{interventions[key]}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={interventions[key]}
+                      onChange={(e) => handleSliderChange(key, parseInt(e.target.value))}
+                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="text-xs text-slate-500 mt-1">{interventionData[key].citation}: {interventionData[key].reduction}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-bold text-slate-700 mb-3 text-sm uppercase tracking-wide">Environmental & Community</h3>
+                
+                {['foodAccess', 'liquorReduction', 'streetLighting', 'blightRemoval'].map(key => (
+                  <div key={key} className="mb-4">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm font-medium text-slate-700">{interventionData[key].name}</span>
+                      <span className="text-sm font-bold text-green-600">{interventions[key]}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={interventions[key]}
+                      onChange={(e) => handleSliderChange(key, parseInt(e.target.value))}
+                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="text-xs text-slate-500 mt-1">{interventionData[key].citation}: {interventionData[key].reduction}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Proposal Modal */}
+      {showProposal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowProposal(false)}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center p-6 border-b">
+              <h2 className="text-2xl font-bold text-slate-800">Implementation Proposal</h2>
+              <button
+                onClick={() => setShowProposal(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <XIcon />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              <pre className="whitespace-pre-wrap font-mono text-xs text-slate-700 bg-slate-50 p-4 rounded">
+                {generateProposal()}
+              </pre>
+            </div>
+            
+            <div className="flex gap-3 p-6 border-t">
+              <button
+                onClick={copyToClipboard}
+                className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              >
+                Copy to Clipboard
+              </button>
+              <button
+                onClick={downloadProposal}
+                className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+              >
+                Download Proposal
+              </button>
+              <button
+                onClick={() => setShowProposal(false)}
+                className="flex-1 bg-slate-600 text-white py-3 rounded-lg font-semibold hover:bg-slate-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+ReactDOM.render(<CrimeDashboard />, document.getElementById('root'));
