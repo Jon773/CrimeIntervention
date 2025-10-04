@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>West Garfield Park Crime Intervention Dashboard</title>
+    <title>DEMO West Garfield Park Crime Intervention Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -327,7 +327,7 @@ This ensures projections are grounded in empirical evidence rather than theoreti
             const activeInterventions = Object.entries(interventions).filter(([_, value]) => value > 0);
             
             let proposal = `WEST GARFIELD PARK CRIME INTERVENTION PROPOSAL
-Chicago Police District 11 | Population: ${baseline.population.toLocaleString()}
+SAMPLE Police District 11 | Population: ${baseline.population.toLocaleString()}
 
 ═══════════════════════════════════════════════════════════════
 
@@ -446,7 +446,7 @@ ${generateMethodologyExplanation()}
 ═══════════════════════════════════════════════════════════════
 
 Prepared: ${new Date().toLocaleDateString()}
-Contact: Chicago Police Department, District 11
+Contact: SAMPLE Police Department, District 11
 `;
 
             return proposal;
@@ -498,7 +498,7 @@ Contact: Chicago Police Department, District 11
                       Help
                     </button>
                   </div>
-                  <p className="text-slate-600 mb-4">Chicago Police District 11 | Population: {baseline.population.toLocaleString()} | Baseline: {baseline.totalCrimes} crimes/year</p>
+                  <p className="text-slate-600 mb-4">SAMPLE Police District 11 | Population: {baseline.population.toLocaleString()} | Baseline: {baseline.totalCrimes} crimes/year</p>
                   
                   <div className="grid grid-cols-4 gap-4 mb-4">
                     <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
@@ -872,3 +872,4 @@ Contact: Chicago Police Department, District 11
 
 
                         
+
